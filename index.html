@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>DailyPulse News</title>
+
+  <!-- ตั้งค่าสำหรับ PWA และ Android 10+ -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- ตั้งค่าสำหรับ iOS 13+ (iPhone) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DailyPulse">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2965/2965879.png">
+
+  <!-- ใช้ Tailwind CSS สำหรับจัดหน้าตาแอป -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      background-color: #f8fafc;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="bg-blue-600 text-white p-1.5 rounded-lg font-bold text-lg">DP</span>
+        <div>
+          <h1 id="app-title" class="font-bold text-lg leading-tight">ข่าวประจำวัน</h1>
+          <p id="last-updated" class="text-xs text-slate-400">อัปเดตล่าสุด: --</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- ปุ่มเลือกภาษา 3 ภาษา -->
+        <div class="flex bg-slate-800 rounded-lg p-0.5 text-xs font-semibold">
+          <button onclick="changeLanguage('th')" id="lang-th" class="px-2.5 py-1.5 rounded-md bg-blue-600 text-white transition">TH</button>
+          <button onclick="changeLanguage('en')" id="lang-en" class="px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white transition">EN</button>
+          <button onclick="changeLanguage('zh')" id="lang-zh" class="px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white transition">中文</button>
+        </div>
+
+        <!-- ปุ่มกด Updated ข่าว -->
+        <button onclick="refreshNews()" id="btn-update" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition">
+          <svg id="update-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          <span id="update-text">อัปเดต</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- แถบเลือก 5 หมวดหมู่ข่าว -->
+    <nav class="bg-slate-800 border-t border-slate-700">
+      <div class="max-w-5xl mx-auto px-4 flex overflow-x-auto no-scrollbar py-2 gap-2" id="category-tabs">
+        <!-- ปุ่มหมวดหมู่จะถูกสร้างด้วย JavaScript -->
+      </div>
+    </nav>
+  </header>
+
+  <!-- พื้นที่แสดงรายการข่าว -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-5">
+    <div id="loading-state" class="hidden py-12 text-center text-slate-500">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-2"></div>
+      <p id="loading-text">กำลังดึงข้อมูลข่าวล่าสุด...</p>
+    </div>
+
+    <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- การ์ดข่าวจะถูกสร้างด้วย JavaScript (อย่างน้อย 6 ข่าวต่อหมวด) -->
+    </div>
+  </main>
+
+  <!-- หน้าต่างแสดงรายละเอียดข่าว (Modal) -->
+  <div id="news-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+    <div class="bg-white w-full max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-fade-in">
+      <div class="relative h-56 sm:h-64 bg-slate-200 shrink-0">
+        <img id="modal-img" src="" alt="News Image" class="w-full h-full object-cover">
+        <button onclick="closeModal()" class="absolute top-3 right-3 bg-black/60 text-white w-9 h-9 rounded-full flex items-center justify-center hover:bg-black/80 text-lg font-bold">✕</button>
+        <span id="modal-category" class="absolute bottom-3 left-3 bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-md shadow"></span>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-3">
+        <p id="modal-date" class="text-xs text-slate-400 font-medium"></p>
+        <h2 id="modal-title" class="text-xl font-bold text-slate-900 leading-snug"></h2>
+        <div id="modal-content" class="text-slate-700 text-sm leading-relaxed space-y-2 pt-2 border-t border-slate-100"></div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center shrink-0">
+        <a id="modal-link" href="#" target="_blank" rel="noopener" class="text-blue-600 hover:underline text-sm font-semibold">อ่านต้นฉบับเต็ม ↗</a>
+        <button onclick="closeModal()" id="modal-close-btn" class="bg-slate-800 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-700">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. ข้อมูลภาษา (3 ภาษา: ไทย, อังกฤษ, จีน) ---
+    const i18n = {
+      th: {
+        appTitle: "ข่าวสารประจำวัน",
+        updateBtn: "อัปเดตข่าว",
+        updating: "กำลังอัปเดต...",
+        lastUpdated: "อัปเดตล่าสุด:",
+        loading: "กำลังดึงข้อมูลข่าวสารล่าสุด...",
+        readMore: "ดูรายละเอียดเพิ่ม →",
+        readSource: "อ่านจากแหล่งข่าวต้นฉบับ ↗",
+        closeBtn: "ปิดหน้าต่าง",
+        categories: {
+          economy: "เศรษฐกิจ",
+          politics: "การเมือง",
+          sports: "กีฬา",
+          entertainment: "บันเทิง",
+          technology: "เทคโนโลยี"
+        }
+      },
+      en: {
+        appTitle: "Daily Pulse News",
+        updateBtn: "Update News",
+        updating: "Updating...",
+        lastUpdated: "Last updated:",
+        loading: "Fetching latest news...",
+        readMore: "Read Details →",
+        readSource: "Read Original Source ↗",
+        closeBtn: "Close",
+        categories: {
+          economy: "Economy",
+          politics: "Politics",
+          sports: "Sports",
+          entertainment: "Entertainment",
+          technology: "Technology"
+        }
+      },
+      zh: {
+        appTitle: "每日新闻快讯",
+        updateBtn: "更新新闻",
+        updating: "更新中...",
+        lastUpdated: "最后更新:",
+        loading: "正在获取最新新闻...",
+        readMore: "查看详情 →",
+        readSource: "阅读原文 ↗",
+        closeBtn: "关闭",
+        categories: {
+          economy: "经济",
+          politics: "政治",
+          sports: "体育",
+          entertainment: "娱乐",
+          technology: "科技"
+        }
+      }
+    };
+
+    // --- 2. แหล่งข่าว RSS สำหรับดึงข้อมูลสดรายวัน ---
+    const rssFeeds = {
+      en: {
+        economy: "https://feeds.bbci.co.uk/news/business/rss.xml",
+        politics: "https://feeds.bbci.co.uk/news/politics/rss.xml",
+        sports: "https://feeds.bbci.co.uk/sport/rss.xml",
+        entertainment: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml",
+        technology: "https://feeds.bbci.co.uk/news/technology/rss.xml"
+      },
+      th: {
+        economy: "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=th&gl=TH&ceid=TH:th",
+        politics: "https://news.google.com/rss/search?q=การเมืองไทย&hl=th&gl=TH&ceid=TH:th",
+        sports: "https://news.google.com/rss/headlines/section/topic/SPORTS?hl=th&gl=TH&ceid=TH:th",
+        entertainment: "https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=th&gl=TH&ceid=TH:th",
+        technology: "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=th&gl=TH&ceid=TH:th"
+      },
+      zh: {
+        economy: "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+        politics: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+        sports: "https://news.google.com/rss/headlines/section/topic/SPORTS?hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+        entertainment: "https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+        technology: "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+      }
+    };
+
+    // รูปภาพประจำหมวดหมู่
+    const categoryImages = {
+      economy: [
+        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=600&auto=format&fit=crop&q=80"
+      ],
+      politics: [
+        "https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1575320181282-9afab399332c?w=600&auto=format&fit=crop&q=80"
+      ],
+      sports: [
+        "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1517649763962-0c623066013b?w=600&auto=format&fit=crop&q=80"
+      ],
+      entertainment: [
+        "https://images.unsplash.com/photo-1603190287605-e6ade32fa852?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
+      ],
+      technology: [
+        "https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=600&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&auto=format&fit=crop&q=80"
+      ]
+    };
+
+    // --- 3. ข้อมูลข่าวสำรอง (การันตีมี 6 ข่าวขึ้นไปต่อหมวดหมู่เสมอ แม้ขณะออฟไลน์) ---
+    function generateFallbackNews(lang, category) {
+      const templates = {
+        th: {
+          economy: [
+            ["ตลาดหุ้นเอเชียปรับตัวรับแนวโน้มดอกเบี้ยใหม่", "นักลงทุนจับตาทิศทางนโยบายการเงินของธนาคารกลางชั้นนำ ส่งผลให้ดัชนีตลาดหลักทรัพย์ในภูมิภาคเอเชียเคลื่อนไหวอย่างคึกคัก โดยมีแรงซื้อเข้ามาในกลุ่มธนาคารและพลังงานอย่างต่อเนื่อง"],
+            ["ส่งออกสินค้าเกษตรและอาหารแปรรูปเติบโตต่อเนื่อง", "ตัวเลขการส่งออกไตรมาสล่าสุดขยายตัวได้ดีเกินคาด โดยเฉพาะกลุ่มอาหารแปรรูปและสินค้าเกษตรนวัตกรรมที่ได้รับความนิยมสูงในตลาดต่างประเทศ"],
+            ["ธุรกิจรายย่อยเร่งปรับตัวสู่ระบบการชำระเงินดิจิทัลเต็มรูปแบบ", "ผู้ประกอบการ SME หันมาใช้ระบบบริหารจัดการร้านค้าและชำระเงินแบบไร้เงินสดมากขึ้น ช่วยลดต้นทุนและเพิ่มความสะดวกให้แก่ผู้บริโภคยุคใหม่"],
+            ["ราคาทองคำและสินทรัพย์ปลอดภัยเคลื่อนไหวผันผวน", "นักวิเคราะห์ประเมินทิศทางราคาทองคำยังคงได้รับแรงหนุนจากความต้องการถือครองสินทรัพย์ปลอดภัย ท่ามกลางการปรับตัวของค่าเงินสกุลหลัก"],
+            ["การท่องเที่ยวฟื้นตัวหนุนรายได้ภาคบริการและโรงแรม", "จำนวนนักท่องเที่ยวต่างชาติที่เดินทางเข้ามาอย่างต่อเนื่อง ส่งผลให้อัตราการเข้าพักโรงแรมและธุรกิจสายการบินมีผลประกอบการที่ดีขึ้นอย่างชัดเจน"],
+            ["เทรนด์เศรษฐกิจสีเขียวดึงดูดเม็ดเงินลงทุนต่างชาติ", "อุตสาหกรรมพลังงานสะอาดและรถยนต์ไฟฟ้ากลายเป็นแม่เหล็กสำคัญในการดึงดูดการลงทุนโดยตรงจากต่างประเทศ (FDI) ในปีนี้"],
+            ["ธนาคารพาณิชย์เปิดตัวสินเชื่อดอกเบี้ยต่ำเพื่อธุรกิจรักษ์โลก", "สถาบันการเงินหลายแห่งพร้อมใจกันออกผลิตภัณฑ์สินเชื่อเพื่อสนับสนุนการติดตั้งโซลาร์รูฟท็อปและลดการปล่อยคาร์บอนในภาคอุตสาหกรรม"]
+          ],
+          politics: [
+            ["สภาเตรียมพิจารณาร่างกฎหมายกระตุ้นเศรษฐกิจดิจิทัล", "ที่ประชุมรัฐสภาบรรจุวาระการพิจารณาร่างกฎหมายสำคัญเพื่อวางรากฐานโครงสร้างพื้นฐานดิจิทัลและส่งเสริมผู้ประกอบการเทคโนโลยีภายในประเทศ"],
+            ["รัฐบาลเดินหน้าแผนพัฒนาโครงสร้างพื้นฐานระบบรางระยะใหม่", "กระทรวงคมนาคมเร่งรัดโครงการรถไฟทางคู่และระบบขนส่งมวลชนในภูมิภาค เพื่อเชื่อมโยงโครงข่ายโลจิสติกส์และลดต้นทุนการขนส่งของประเทศ"],
+            ["การประชุมความร่วมมือระดับภูมิภาคอาเซียนด้านความมั่นคง", "ตัวแทนจากประเทศสมาชิกอาเซียนร่วมหารือแนวทางการสร้างเสถียรภาพและความร่วมมือทางเศรษฐกิจข้ามพรมแดนอย่างยั่งยืน"],
+            ["กทม. และท้องถิ่นขยายระบบบริการประชาชนผ่านแอปพลิเคชัน", "หน่วยงานท้องถิ่นยกระดับการให้บริการประชาชนแบบ One-Stop Service ผ่านระบบออนไลน์ ลดขั้นตอนเอกสารและเพิ่มความโปร่งใสในการทำงาน"],
+            ["คณะกรรมาธิการเปิดรับฟังความคิดเห็นการปฏิรูปการศึกษา", "เปิดเวทีรับฟังข้อเสนอแนะจากภาคประชาชนและบุคลากรทางการศึกษา เพื่อนำไปปรับปรุงหลักสูตรให้สอดคล้องกับตลาดแรงงานยุคใหม่"],
+            ["นโยบายส่งเสริมสวัสดิการสังคมสำหรับสังคมผู้สูงอายุ", "ภาครัฐเตรียมมาตรการรองรับสังคมผู้สูงวัยอย่างครบวงจร ทั้งด้านการรักษาพยาบาลเบื้องต้นและการส่งเสริมอาชีพหลังเกษียณ"],
+            ["ความคืบหน้าการเจรจาข้อตกลงการค้าเสรีทวิภาคีฉบับใหม่", "คณะผู้แทนการค้าเผยผลการเจรจาเป็นไปในทิศทางบวก คาดว่าจะช่วยลดกำแพงภาษีและเปิดตลาดสินค้าไทยได้กว้างขึ้น"]
+          ],
+          sports: [
+            ["ศึกฟุตบอลลีกยุโรปเข้มข้น ทีมนำเก็บชัยชนะต่อเนื่อง", "การแข่งขันฟุตบอลลีกสูงสุดของยุโรปสัปดาห์นี้เต็มไปด้วยความสนุก ทีมจ่าฝูงโชว์ฟอร์มแกร่งเก็บ 3 คะแนนสำคัญ รักษาระยะห่างในการลุ้นแชมป์"],
+            ["ทัพนักกีฬาวอลเลย์บอลหญิงซ้อมเข้มก่อนลุยศึกนานาชาติ", "ทีมวอลเลย์บอลหญิงรวมตัวฝึกซ้อมวางแท็กติกและฟื้นฟูสมรรถภาพร่างกาย เตรียมความพร้อมก่อนเดินทางไปแข่งขันรายการระดับโลก"],
+            ["นักแบดมินตันดาวรุ่งทะลุเข้าชิงชนะเลิศศึกเวิลด์ทัวร์", "โชว์ฟอร์มสุดยอดด้วยการเอาชนะมือวางอันดับต้นของรายการ ทะยานเข้าสู่รอบชิงชนะเลิศได้สำเร็จ สร้างความประทับใจให้แฟนกีฬา"],
+            ["การแข่งขันวิ่งมาราธอนนานาชาติมีผู้เข้าร่วมกว่าหมื่นคน", "บรรยากาศงานวิ่งมาราธอนประจำปีเป็นไปอย่างคึกคัก นักวิ่งทั้งชาวไทยและต่างชาติร่วมสร้างสีสันและกระตุ้นการท่องเที่ยวเชิงกีฬา"],
+            ["วงการอีสปอร์ตเตรียมจัดทัวร์นาเมนต์ชิงแชมป์ระดับเอเชีย", "การแข่งขันกีฬาอีสปอร์ตรายการใหญ่ประกาศตารางการแข่งขันอย่างเป็นทางการ พร้อมเงินรางวัลรวมมูลค่าสูง ดึงดูดทีมชั้นนำทั่วภูมิภาค"],
+            ["นักกอล์ฟโชว์วงสวิงแม่นยำ ขยับขึ้นนำเดี่ยวรอบสาม", "การแข่งขันกอล์ฟอาชีพสัปดาห์นี้เข้มข้น ผู้นำทำสกอร์เพิ่มได้อีกหลายอันเดอร์พาร์ ทิ้งห่างอันดับสองก่อนเข้าสู่วันสุดท้าย"],
+            ["สโมสรฟุตบอลชั้นนำเปิดตัวศูนย์ฝึกเยาวชนมาตรฐานระดับโลก", "มุ่งเน้นการพัฒนาทักษะนักเตะเยาวชนตั้งแต่อายุยังน้อย พร้อมนำวิทยาศาสตร์การกีฬาสมัยใหม่เข้ามาใช้ดูแลอย่างเต็มรูปแบบ"]
+          ],
+          entertainment: [
+            ["ภาพยนตร์ไทยแนวสยองขวัญ-ดราม่าทำรายได้เปิดตัวถล่มทลาย", "กระแสตอบรับดีเยี่ยมตั้งแต่วันแรกที่เข้าฉาย ด้วยเนื้อเรื่องที่เข้มข้นและการแสดงอันทรงพลัง ทำให้กวาดรายได้ขึ้นแท่นอันดับหนึ่งบ็อกซ์ออฟฟิศ"],
+            ["ศิลปินเตรียมจัดคอนเสิร์ตใหญ่เต็มรูปแบบปลายปีนี้", "ประกาศข่าวดีให้แฟนเพลงได้เตรียมตัวกดบัตร กับคอนเสิร์ตใหญ่ที่จะมาพร้อมโปรดักชันแสงสีเสียงอลังการและแขกรับเชิญสุดพิเศษ"],
+            ["ซีรีส์สตรีมมิงเรื่องใหม่ติดเทรนด์ยอดนิยมในหลายประเทศ", "หลังปล่อยฉายเพียงไม่กี่วัน ซีรีส์แนวสืบสวนสอบสวนเรื่องใหม่ก็ได้รับคำชมอย่างล้นหลามและทะยานขึ้นสู่อันดับ 1 บนแพลตฟอร์มสตรีมมิง"],
+            ["เทศกาลดนตรีนานาชาติประกาศไลน์อัปศิลปินชุดแรก", "รวบรวมศิลปินอินดี้และป๊อปชื่อดังจากทั่วโลกมาไว้ในงานเดียว เตรียมเนรมิตพื้นที่จัดงานให้กลายเป็นแลนด์มาร์กของคนรักเสียงเพลง"],
+            ["วงการเพลงป๊อปคึกคัก เกิร์ลกรุ๊ปปล่อยซิงเกิลใหม่ยอดวิวพุ่ง", "มิวสิกวิดีโอเพลงใหม่ล่าสุดสร้างปรากฏการณ์ยอดผู้ชมทะลุล้านอย่างรวดเร็ว พร้อมท่าเต้นสุดฮิตที่กำลังเป็นไวรัลในโซเชียลมีเดีย"],
+            ["งานประกาศรางวัลภาพยนตร์ระดับโลกเผยรายชื่อผู้เข้าชิง", "บรรดาภาพยนตร์น้ำดีและนักแสดงมากฝีมือต่างมีชื่อเข้าชิงรางวัลในสาขาสำคัญ ลุ้นผลพร้อมกันในเดือนหน้า"],
+            ["นิทรรศการศิลปะดิจิทัลอิมเมอร์ซีฟเปิดให้เข้าชมแล้ววันนี้", "ชวนสัมผัสประสบการณ์การชมงานศิลปะรูปแบบใหม่ที่ผสมผสานเทคโนโลยีโปรเจกชัน 360 องศาและดนตรีประกอบสุดล้ำ"]
+          ],
+          technology: [
+            ["เปิดตัวโมเดล AI รุ่นใหม่ ประมวลผลภาษาและภาพแม่นยำขึ้น", "บริษัทเทคโนโลยีชั้นนำเผยโฉมปัญญาประดิษฐ์เจเนอเรชันใหม่ที่สามารถเข้าใจบริบทซับซ้อนได้ดีขึ้น และใช้พลังงานในการประมวลผลลดลง"],
+            ["สมาร์ตโฟนเรือธงรุ่นใหม่ชูจุดเด่นกล้องถ่ายภาพและชิป AI ในตัว", "ยกระดับการถ่ายภาพในที่แสงน้อยและฟีเจอร์ตกแต่งภาพอัจฉริยะแบบเรียลไทม์ พร้อมแบตเตอรี่ที่ใช้งานได้ยาวนานตลอดวัน"],
+            ["ผู้เชี่ยวชาญแนะวิธีป้องกันภัยไซเบอร์และการหลอกลวงออนไลน์", "เตือนภัยรูปแบบการโจมตีทางไซเบอร์ยุคใหม่ที่ใช้เทคโนโลยีปลอมแปลงเสียงและภาพ แนะผู้ใช้ตั้งค่ายืนยันตัวตนสองชั้นเสมอ"],
+            ["เทคโนโลยีแบตเตอรี่โซลิดสเตตพัฒนาไปอีกขั้น ชาร์จไวขึ้น", "ทีมวิจัยประสบความสำเร็จในการเพิ่มความหนาแน่นพลังงานของแบตเตอรี่รถยนต์ไฟฟ้า ช่วยให้วิ่งได้ไกลขึ้นและลดเวลาในการชาร์จไฟ"],
+            ["คลาวด์คอมพิวติ้งและดาต้าเซ็นเตอร์ในภูมิภาคขยายตัวต่อเนื่อง", "บริษัทเทคโนโลยีระดับโลกทุ่มงบสร้างศูนย์ข้อมูลแห่งใหม่ เพื่อรองรับการใช้งานบริการดิจิทัลและ AI ที่เติบโตอย่างก้าวกระโดด"],
+            ["อุปกรณ์สวมใส่อัจฉริยะเพิ่มฟีเจอร์ตรวจจับสุขภาพเชิงลึก", "สมาร์ตวอตช์และแหวนอัจฉริยะรุ่นใหม่สามารถวิเคราะห์คุณภาพการนอนหลับ ระดับความเครียด และแจ้งเตือนความผิดปกติของหัวใจได้แม่นยำ"],
+            ["นักพัฒนาซอฟต์แวร์หันมาใช้เครื่องมือช่วยเขียนโค้ดอัตโนมัติ", "ผลสำรวจชี้ว่าการใช้ผู้ช่วย AI ในการพัฒนาซอฟต์แวร์ช่วยลดเวลาการตรวจสอบข้อผิดพลาดและเพิ่มประสิทธิภาพการทำงานของทีมได้อย่างมาก"]
+          ]
+        },
+        en: {
+          economy: [
+            ["Global Markets Rally Amid Positive Inflation Data", "Stock markets across major financial hubs posted strong gains today as recent economic reports suggest inflation is stabilizing, boosting investor confidence."],
+            ["Central Banks Signal Steady Approach to Interest Rates", "Policymakers emphasized a data-driven strategy during the latest monetary policy meeting, aiming to balance sustainable growth with price stability."],
+            ["E-Commerce and Digital Payments Reach Record Volume", "Consumer shift toward mobile banking and contactless transactions continues to accelerate, driving strong revenue growth for fintech companies."],
+            ["Supply Chain Innovations Reduce Global Shipping Delays", "Logistics firms are adopting predictive analytics and automated port management to streamline cargo movement and cut operational costs."],
+            ["Green Energy Investments Surpass Traditional Sector Funding", "Institutional investors are increasingly allocating capital toward solar, wind, and grid-storage projects as global demand for clean power rises."],
+            ["Small Businesses Expand International Reach via Online Platforms", "Cross-border digital marketplaces have enabled small and medium enterprises to export goods to new overseas markets with minimal overhead."],
+            ["Commodities Market Sees Steady Demand for Industrial Metals", "Infrastructure development and electric vehicle manufacturing continue to support global demand for copper, lithium, and aluminum."]
+          ],
+          politics: [
+            ["Lawmakers Debate New Digital Privacy and AI Regulation Bill", "Parliamentary committees held extensive sessions today to review proposed legislation aimed at protecting consumer data and ensuring safe AI deployment."],
+            ["International Summit Focuses on Climate Trade Agreements", "World leaders gathered to discuss cooperative frameworks that reward carbon reduction and promote sustainable cross-border trade."],
+            ["New Urban Infrastructure Plan Approved for Major Cities", "The government announced a multi-year funding package dedicated to expanding public transit networks and upgrading municipal water systems."],
+            ["Diplomatic Talks Aim to Strengthen Regional Economic Ties", "Bilateral meetings between trade ministers concluded with a joint statement pledging closer cooperation on technology and energy security."],
+            ["Public Sector Modernization Initiative Launches Digital Portal", "Citizens can now access over a hundred government services through a unified secure platform, reducing paperwork and processing times."],
+            ["Education Reform Committee Proposes Updated STEM Curriculum", "Policy advisors recommended integrating coding, data literacy, and financial education into secondary school programs nationwide."],
+            ["Healthcare Policy Review Targets Rural Medical Access", "New legislative measures seek to expand telemedicine infrastructure and provide incentives for healthcare professionals in underserved areas."]
+          ],
+          sports: [
+            ["Title Race Heats Up After Thrilling Weekend Football Matches", "A dramatic late goal secured three crucial points for the league leaders, keeping fans on the edge of their seats as the season enters its final stretch."],
+            ["National Track and Field Team Sets New Relay Record", "Sprinters delivered a stunning performance at the international athletics meet, shaving fractions of a second off the previous championship record."],
+            ["Rising Tennis Star Advances to Grand Slam Semifinals", "Showing remarkable composure under pressure, the unseeded player defeated a top-ten opponent in straight sets."],
+            ["City Marathon Attracts Record Number of International Runners", "Thousands of athletes competed in cool morning conditions, with the men's and women's winners both posting personal best times."],
+            ["Basketball Playoffs Begin With High-Scoring Overtime Thriller", "Both teams traded leads throughout the fourth quarter before a clutch three-pointer sealed the opening game victory."],
+            ["Formula Racing Teams Unveil Aerodynamic Upgrades Ahead of GP", "Engineers have introduced revised wing designs and hybrid power unit optimizations to gain crucial tenths of a second on the circuit."],
+            ["Youth Sports Academy Expands Grassroots Training Programs", "A new initiative aims to provide free coaching and equipment to thousands of young athletes across community centers."]
+          ],
+          entertainment: [
+            ["Sci-Fi Blockbuster Tops Global Box Office on Opening Weekend", "Audiences flocked to theaters for the visually stunning space adventure, praising its practical effects and emotional storytelling."],
+            ["Acclaimed Drama Series Sweeps Major Television Awards", "The ensemble cast and writing team took home top honors for their compelling portrayal of a family business empire."],
+            ["World Tour Announced by Chart-Topping Pop Artist", "Fans across five continents are preparing for ticket sales as the stadium tour promises brand-new stage production and surprise guests."],
+            ["Independent Film Festival Highlights Emerging Directors", "Critics praised the diverse lineup of documentaries and feature films premiering at this year's international cinema showcase."],
+            ["Streaming Platform Reveals Slate of Upcoming Original Movies", "Viewers can look forward to a mix of mystery thrillers, animated adventures, and historical dramas releasing over the next quarter."],
+            ["Symphony Orchestra Collaborates With Electronic Music Producer", "The sold-out concert blended classical instrumentation with modern synthesizers, earning a standing ovation from the audience."],
+            ["Best-Selling Mystery Novel Set for Big-Screen Adaptation", "Production is officially underway on the film adaptation, with an award-winning director attached to helm the project."]
+          ],
+          technology: [
+            ["Next-Generation AI Assistants Bring Real-Time Reasoning", "Tech companies are rolling out multimodal AI updates capable of analyzing complex documents, code, and live video feeds seamlessly."],
+            ["Breakthrough in Quantum Computing Error Correction Reported", "Researchers demonstrated a more stable logical qubit architecture, marking a key milestone toward practical quantum processors."],
+            ["New Smartphone Lineup Features Advanced On-Device Processing", "With dedicated neural engines, the latest mobile devices can run translation and photo enhancement locally without an internet connection."],
+            ["Cybersecurity Firms Roll Out Automated Threat Detection Tools", "Machine learning systems are helping enterprises identify and neutralize phishing attempts and network anomalies in milliseconds."],
+            ["Open-Source Robotics Project Accelerates Warehouse Automation", "Developers worldwide are contributing to a shared software framework that helps robots navigate dynamic environments safely."],
+            ["Satellite Internet Constellations Expand High-Speed Coverage", "Remote communities and aviation providers are gaining access to low-latency broadband as new orbital shells become operational."],
+            ["Smart Home Standards Unite Under Universal Connectivity Protocol", "Appliances, lighting, and security sensors from different brands can now communicate locally with simpler setup and better privacy."]
+          ]
+        },
+        zh: {
+          economy: [
+            ["全球金融市场回暖，科技与新能源板块领涨", "受最新经济数据利好影响，主要股票市场今日普遍上涨，投资者对本季度企业盈利前景保持乐观态度。"],
+            ["跨境电商出口持续增长，数字化物流体系立功", "随着海外仓储网络和智能清关系统的完善，中小型制造企业通过跨境平台实现了订单量的稳步提升。"],
+            ["绿色金融支持力度加大，清洁能源项目获资金青睐", "多家金融机构推出专项绿色债券与低碳转型贷款，助力光伏、风电及储能产业链的高质量发展。"],
+            ["移动支付与数字经济深度融合，激发消费新活力", "线下商超与餐饮行业全面普及智能化收银与会员营销系统，带动周末及节假日消费数据稳步攀升。"],
+            ["黄金与大宗商品市场交易活跃，避险与工业需求并存", "市场分析师指出，全球制造业复苏带动了工业金属需求，同时贵金属依然是投资组合中的重要配置。"],
+            ["旅游与酒店业迎来预订高峰，服务业景气度持续回升", "随着航线运力恢复及签证便利化措施落地，国内外旅游市场表现亮眼，有效拉动地方综合消费。"],
+            ["供应链数字化升级帮助制造企业显著降低库存成本", "通过引入人工智能需求预测系统，众多传统工厂实现了按需生产与高效配送，提升了整体利润率。"]
+          ],
+          politics: [
+            ["多国代表齐聚区域合作论坛，共商经贸与可持续发展", "与会各方就降低贸易壁垒、加强数字经济互联互通以及应对气候变化等议题达成了广泛共识。"],
+            ["智慧城市与数字政务建设提速，便民服务实现一网通办", "多地政府部门升级线上政务平台，市民和企业可通过手机端完成上百项审批与申报业务，大幅提升办事效率。"],
+            ["立法机构审议数据安全与人工智能治理相关草案", "为促进技术创新与保障公民隐私并重，相关部门正广泛征求专家与公众意见，完善数字时代法律法规。"],
+            ["新一轮交通基础设施规划公布，重点推进城际轨道建设", "该项目旨在进一步缩短城市群之间的通行时间，完善综合交通枢纽，促进区域经济协调发展。"],
+            ["教育部门推动职业教育与现代产业需求精准对接", "通过校企合作与实训基地建设，培养更多具备数字技能和先进制造经验的高素质技术人才。"],
+            ["养老与医疗保障体系持续完善，社区健康服务站扩面", "政策重点支持社区嵌入式养老服务，并推进远程医疗覆盖更多基层与偏远地区。"],
+            ["生态环境保护专项行动取得阶段性成果，城市绿化率提升", "通过持续推进流域治理与城市公园绿地建设，多个城市的空气质量优良天数比例创下近年来新高。"]
+          ],
+          sports: [
+            ["足球联赛争冠进入白热化阶段，榜首球队客场全取三分", "在本轮焦点战中，领头羊凭借下半场的精彩配合攻入制胜一球，继续在积分榜上保持领先优势。"],
+            ["国际羽毛球公开赛激战正酣，年轻选手爆冷闯入决赛", "面对经验丰富的头号种子，小将展现出极强的心理素质与多拍相持能力，赢得现场观众热烈掌声。"],
+            ["城市马拉松赛事圆满落幕，数万名跑者共享运动盛宴", "清晨的赛道气氛热烈，来自世界各地的专业运动员与业余跑者共同参赛，多项赛会纪录被刷新。"],
+            ["女排国家队开启新一期集训，全力备战世界大赛", "教练组针对发球与拦防环节进行了高强度针对性训练，队员们状态饱满，力争在接下来的赛事中取得佳绩。"],
+            ["篮球季后赛首轮上演加时大战，核心球员砍下高分", "双方在常规时间战成平手，最终主队依靠稳定的罚球与关键抢断锁定胜局，取得系列赛开门红。"],
+            ["电子竞技亚洲杯赛程正式公布，多支顶尖战队同台竞技", "本届赛事不仅升级了场馆视听体验，还将采用全新版本规则，吸引了众多年轻体育迷的关注。"],
+            ["青少年冰雪与水上运动普及计划在多所学校推广", "通过配备专业教练与安全设施，更多青少年得以接触多样化的体育项目，增强体质并培养团队精神。"]
+          ],
+          entertainment: [
+            ["国产科幻与悬疑题材电影周末票房表现强劲", "凭借紧凑的剧情节奏和出色的视觉特效，新上映的影片在各大购票平台获得高分评价，观影人次持续攀升。"],
+            ["知名歌手正式官宣年度巡回演唱会，舞美设计全面升级", "此次巡演将覆盖十余座城市，采用沉浸式环绕音响与巨型LED天幕，为歌迷带来视听盛宴。"],
+            ["热门古装与现代都市剧集在海外流媒体平台收获好评", "精良的服化道制作与引发共鸣的情感故事，让多部剧集成功登上多国流媒体热播榜单。"],
+            ["国际电影节公布主竞赛单元入围名单，佳作云集", "多位青年导演的处女作与资深影人的新作同台角逐，涵盖了家庭剧情、纪录片与动画等多种类型。"],
+            ["户外音乐节阵容揭晓，融合流行、摇滚与独立音乐", "主办方同时设置了艺术装置区与创意市集，打造兼具音乐欣赏与休闲社交的周末文化空间。"],
+            ["传统戏曲与现代数字光影技术结合，创新舞台剧场座无虚席", "通过全息投影与新编曲目，古老艺术焕发出全新魅力，吸引了大量年轻观众走进剧场。"],
+            ["畅销科幻小说确认改编为同名影视剧，概念海报首度曝光", "主创团队表示将高度还原原著中的宏大世界观，目前已进入前期美术设计与选角阶段。"]
+          ],
+          technology: [
+            ["新一代多模态人工智能模型发布，推理与创作能力大幅跃升", "该模型支持超长文本解析、代码编写及实时语音交互，并可在企业办公与科研领域提供高效辅助。"],
+            ["固态电池研发取得新突破，新能源汽车续航与充电速度双提升", "实验室数据显示，新型电解质材料有效提升了电池安全性与能量密度，商业化量产进程正在加快。"],
+            ["智能手机迎来端侧AI普及潮，离线也能实现实时翻译与修图", "搭载新一代神经网络芯片的移动设备，不仅提升了运行速度，还进一步保障了用户的本地数据隐私。"],
+            ["人形机器人与智能制造装备在工业流水线展开实景测试", "具备高精度视觉识别与灵活机械臂的机器人，已能够协助完成零件分拣、组装及质量检测等复杂任务。"],
+            ["网络安全专家提醒防范新型AI语音与视频合成诈骗", "建议公众在涉及资金转账时务必通过多重渠道核实身份，并开启账户的双重身份验证功能。"],
+            ["低轨卫星互联网技术持续演进，偏远地区与航空网络更畅通", "随着更多通信卫星顺利入轨组网，海洋航行、沙漠科考及民航客机上的高速上网体验得到显著改善。"],
+            ["开源软件生态蓬勃发展，AI编程助手成为开发者标配工具", "调查显示，超过七成的软件工程师在日常开发中使用智能代码补全与测试工具，大幅缩短了项目周期。"]
+          ]
+        }
+      };
+
+      const list = templates[lang][category] || templates['th'][category];
+      const now = new Date();
+      return list.map((item, idx) => {
+        const itemDate = new Date(now.getTime() - idx * 3600 * 1000);
+        return {
+          id: `${lang}-${category}-${idx}`,
+          title: item[0],
+          summary: item[1],
+          content: `<p>${item[1]}</p><p class="mt-3">รายงานข่าวระบุเพิ่มเติมว่า แนวโน้มดังกล่าวได้รับความสนใจจากทั้งภาครัฐและเอกชน ซึ่งมีการติดตามสถานการณ์อย่างใกล้ชิดเพื่อประเมินผลกระทบและโอกาสในการพัฒนาต่อไปในอนาคต</p>`,
+          pubDate: itemDate.toLocaleDateString(lang === 'th' ? 'th-TH' : lang === 'zh' ? 'zh-CN' : 'en-US', {
+            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          }),
+          image: categoryImages[category][idx % categoryImages[category].length],
+          link: "https://news.google.com"
+        };
+      });
+    }
+
+    // --- 4. สถานะการทำงานของแอป ---
+    let currentLang = localStorage.getItem('dp_lang') || 'th';
+    let currentCategory = 'economy';
+    const categories = ['economy', 'politics', 'sports', 'entertainment', 'technology'];
+    let newsCache = {};
+
+    // --- 5. ฟังก์ชันหลักในการดึงข่าวและแสดงผล ---
+    async function fetchCategoryNews(lang, category, forceRefresh = false) {
+      const cacheKey = `${lang}_${category}`;
+      if (!forceRefresh && newsCache[cacheKey] && newsCache[cacheKey].length >= 6) {
+        return newsCache[cacheKey];
+      }
+
+      const fallbackItems = generateFallbackNews(lang, category);
+      const rssUrl = rssFeeds[lang]?.[category];
+      if (!rssUrl) {
+        newsCache[cacheKey] = fallbackItems;
+        return fallbackItems;
+      }
+
+      try {
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (data.status === 'ok' && Array.isArray(data.items) && data.items.length > 0) {
+          const liveItems = data.items.map((item, idx) => {
+            const cleanDesc = (item.description || item.content || '').replace(/<[^>]+>/g, '').trim();
+            return {
+              id: `live-${lang}-${category}-${idx}`,
+              title: item.title,
+              summary: cleanDesc.length > 20 ? cleanDesc : fallbackItems[idx % fallbackItems.length].summary,
+              content: `<p>${cleanDesc || item.title}</p><p class="mt-3 text-slate-500 text-xs">${item.author ? 'Source: ' + item.author : ''}</p>`,
+              pubDate: item.pubDate ? new Date(item.pubDate).toLocaleString(lang === 'th' ? 'th-TH' : lang === 'zh' ? 'zh-CN' : 'en-US') : fallbackItems[0].pubDate,
+              image: item.thumbnail || item.enclosure?.link || categoryImages[category][idx % categoryImages[category].length],
+              link: item.link || "https://news.google.com"
+            };
+          });
+
+          // การันตีว่ามีอย่างน้อย 6 ข่าวเสมอ หาก RSS ส่งมาน้อยกว่า 6 ให้เติมจากรายการสำรอง
+          while (liveItems.length < 6) {
+            liveItems.push(fallbackItems[liveItems.length]);
+          }
+
+          newsCache[cacheKey] = liveItems;
+          return liveItems;
+        }
+      } catch (err) {
+        console.warn("Using fallback news due to network/CORS:", err);
+      }
+
+      newsCache[cacheKey] = fallbackItems;
+      return fallbackItems;
+    }
+
+    function updateUIText() {
+      const t = i18n[currentLang];
+      document.getElementById('app-title').textContent = t.appTitle;
+      document.getElementById('update-text').textContent = t.updateBtn;
+      document.getElementById('loading-text').textContent = t.loading;
+      document.getElementById('modal-close-btn').textContent = t.closeBtn;
+      document.getElementById('modal-link').textContent = t.readSource;
+
+      // ไฮไลต์ปุ่มภาษา
+      ['th', 'en', 'zh'].forEach(l => {
+        const btn = document.getElementById(`lang-${l}`);
+        if (l === currentLang) {
+          btn.className = "px-2.5 py-1.5 rounded-md bg-blue-600 text-white transition";
+        } else {
+          btn.className = "px-2.5 py-1.5 rounded-md text-slate-300 hover:text-white transition";
+        }
+      });
+
+      // สร้างแท็บ 5 หมวดหมู่
+      const tabsContainer = document.getElementById('category-tabs');
+      tabsContainer.innerHTML = categories.map(cat => {
+        const isActive = cat === currentCategory;
+        return `
+          <button onclick="selectCategory('${cat}')"
+            class="px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition ${
+              isActive ? 'bg-blue-600 text-white shadow' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
+            }">
+            ${t.categories[cat]}
+          </button>
+        `;
+      }).join('');
+
+      updateTimestamp();
+    }
+
+    function updateTimestamp() {
+      const t = i18n[currentLang];
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString(currentLang === 'th' ? 'th-TH' : currentLang === 'zh' ? 'zh-CN' : 'en-US', {
+        hour: '2-digit', minute: '2-digit'
+      });
+      const dateStr = now.toLocaleDateString(currentLang === 'th' ? 'th-TH' : currentLang === 'zh' ? 'zh-CN' : 'en-US', {
+        day: 'numeric', month: 'short', year: 'numeric'
+      });
+      document.getElementById('last-updated').textContent = `${t.lastUpdated} ${dateStr} ${timeStr}`;
+    }
+
+    async function renderNews(forceRefresh = false) {
+      const grid = document.getElementById('news-grid');
+      const loader = document.getElementById('loading-state');
+      const t = i18n[currentLang];
+
+      grid.classList.add('hidden');
+      loader.classList.remove('hidden');
+
+      const articles = await fetchCategoryNews(currentLang, currentCategory, forceRefresh);
+
+      loader.classList.add('hidden');
+      grid.classList.remove('hidden');
+
+      grid.innerHTML = articles.map((item, idx) => `
+        <article onclick="openArticle(${idx})" class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col cursor-pointer hover:shadow-md active:scale-[0.99] transition">
+          <div class="h-44 bg-slate-200 relative overflow-hidden">
+            <img src="${item.image}" alt="" loading="lazy" onerror="this.src='${categoryImages[currentCategory][0]}'" class="w-full h-full object-cover">
+            <span class="absolute top-2.5 left-2.5 bg-slate-900/80 backdrop-blur-sm text-white text-[11px] font-semibold px-2.5 py-0.5 rounded">
+              ${t.categories[currentCategory]}
+            </span>
+          </div>
+          <div class="p-4 flex-1 flex flex-col justify-between">
+            <div>
+              <p class="text-[11px] text-slate-400 mb-1">${item.pubDate}</p>
+              <h3 class="font-bold text-slate-900 text-base leading-snug line-clamp-2 mb-2">${item.title}</h3>
+              <p class="text-slate-600 text-xs leading-relaxed line-clamp-3">${item.summary}</p>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span class="text-blue-600 text-xs font-semibold">${t.readMore}</span>
+              <span class="text-slate-400 text-xs">#${idx + 1}</span>
+            </div>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    // --- 6. ฟังก์ชันควบคุมการกดปุ่มของผู้ใช้ ---
+    function changeLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('dp_lang', lang);
+      updateUIText();
+      renderNews(false);
+    }
+
+    function selectCategory(category) {
+      currentCategory = category;
+      updateUIText();
+      renderNews(false);
+    }
+
+    async function refreshNews() {
+      const icon = document.getElementById('update-icon');
+      const text = document.getElementById('update-text');
+      const t = i18n[currentLang];
+
+      icon.classList.add('animate-spin');
+      text.textContent = t.updating;
+
+      // ล้างแคชของหมวดปัจจุบันแล้วดึงข้อมูลสดใหม่
+      delete newsCache[`${currentLang}_${currentCategory}`];
+      await renderNews(true);
+      updateTimestamp();
+
+      setTimeout(() => {
+        icon.classList.remove('animate-spin');
+        text.textContent = t.updateBtn;
+      }, 400);
+    }
+
+    async function openArticle(index) {
+      const articles = await fetchCategoryNews(currentLang, currentCategory, false);
+      const item = articles[index];
+      if (!item) return;
+
+      const t = i18n[currentLang];
+      document.getElementById('modal-img').src = item.image;
+      document.getElementById('modal-category').textContent = t.categories[currentCategory];
+      document.getElementById('modal-date').textContent = item.pubDate;
+      document.getElementById('modal-title').textContent = item.title;
+      document.getElementById('modal-content').innerHTML = item.content;
+      document.getElementById('modal-link').href = item.link;
+
+      document.getElementById('news-modal').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      document.getElementById('news-modal').classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    // --- 7. ลงทะเบียน Service Worker สำหรับ PWA ---
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+      });
+    }
+
+    // เริ่มต้นทำงานเมื่อเปิดแอป
+    updateUIText();
+    renderNews(false);
+  </script>
+</body>
+</html>
